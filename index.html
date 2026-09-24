@@ -299,6 +299,58 @@ const cupons = {
 
 let cupomAtual = null;
 
+/*
+ * CONTROLE DE CUPOM SEM BANCO DE DADOS
+ * ------------------------------------
+ * Cada navegador recebe um identificador local (localStorage).
+ * Quando um cupom é confirmado ao clicar em "WhatsApp" em um plano
+ * mensal com desconto, ele é marcado como utilizado neste navegador.
+ *
+ * IMPORTANTE:
+ * Este método não é 100% seguro. O usuário pode apagar os dados do
+ * navegador, usar outro navegador/dispositivo ou acessar em modo anônimo.
+ */
+
+const STORAGE_DEVICE_ID = "goldplay_device_id";
+const STORAGE_USED_COUPONS = "goldplay_used_coupons";
+
+function obterIdDispositivo() {
+  let deviceId = localStorage.getItem(STORAGE_DEVICE_ID);
+
+  if (!deviceId) {
+    if (window.crypto && crypto.randomUUID) {
+      deviceId = crypto.randomUUID();
+    } else {
+      deviceId = "gp-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    }
+
+    localStorage.setItem(STORAGE_DEVICE_ID, deviceId);
+  }
+
+  return deviceId;
+}
+
+function obterCuponsUsados() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_USED_COUPONS) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function cupomJaUsado(codigo) {
+  return obterCuponsUsados().includes(codigo);
+}
+
+function marcarCupomComoUsado(codigo) {
+  const usados = obterCuponsUsados();
+
+  if (!usados.includes(codigo)) {
+    usados.push(codigo);
+    localStorage.setItem(STORAGE_USED_COUPONS, JSON.stringify(usados));
+  }
+}
+
 function aplicarCupom() {
   const input = document.getElementById("couponInput");
   const message = document.getElementById("couponMessage");
@@ -312,21 +364,31 @@ function aplicarCupom() {
     return;
   }
 
-  if (Object.prototype.hasOwnProperty.call(cupons, codigo)) {
-    cupomAtual = codigo;
-    message.textContent = "Cupom válido! O desconto será calculado conforme o plano mensal escolhido.";
-    message.classList.add("success");
-
-    document.getElementById("couponCodeDisplay").textContent = codigo;
-    document.getElementById("couponDiscountDisplay").textContent = " — desconto disponível nos planos mensais";
-    document.getElementById("couponApplied").style.display = "flex";
-    input.value = codigo;
-  } else {
+  if (!Object.prototype.hasOwnProperty.call(cupons, codigo)) {
     cupomAtual = null;
     document.getElementById("couponApplied").style.display = "none";
     message.textContent = "Cupom inválido ou inexistente.";
     message.classList.add("error");
+    return;
   }
+
+  if (cupomJaUsado(codigo)) {
+    cupomAtual = null;
+    document.getElementById("couponApplied").style.display = "none";
+    message.textContent = "⚠️ Este cupom já foi utilizado neste navegador.";
+    message.classList.add("error");
+    return;
+  }
+
+  cupomAtual = codigo;
+  message.textContent = "Cupom válido! O desconto será aplicado no plano mensal.";
+  message.classList.add("success");
+
+  document.getElementById("couponCodeDisplay").textContent = codigo;
+  document.getElementById("couponDiscountDisplay").textContent =
+    " — desconto disponível nos planos mensais";
+  document.getElementById("couponApplied").style.display = "flex";
+  input.value = codigo;
 }
 
 function removerCupom() {
@@ -356,16 +418,30 @@ function obterValorComCupom(valorOriginal, permiteCupom = false) {
   }
 
   const valorFinal = Number(valorPromocional.toFixed(2));
-  const descontoPercentual = Number(((1 - valorFinal / Number(valorOriginal)) * 100).toFixed(2));
+  const descontoPercentual = Number(
+    ((1 - valorFinal / Number(valorOriginal)) * 100).toFixed(2)
+  );
 
   return { valorFinal, descontoPercentual };
 }
 
 function formatarMoeda(valor) {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return valor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
 }
 
 function contratarPlano(nomePlano, telas, valorOriginal, permiteCupom = false) {
+  if (cupomAtual && cupomJaUsado(cupomAtual)) {
+    const message = document.getElementById("couponMessage");
+    message.textContent = "⚠️ Este cupom já foi utilizado neste navegador.";
+    message.className = "coupon-message error";
+    cupomAtual = null;
+    document.getElementById("couponApplied").style.display = "none";
+    return;
+  }
+
   const resultado = obterValorComCupom(valorOriginal, permiteCupom);
   const valorFinal = resultado.valorFinal;
   const descontoPercentual = resultado.descontoPercentual;
@@ -383,12 +459,25 @@ function contratarPlano(nomePlano, telas, valorOriginal, permiteCupom = false) {
   }
 
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
+
+  // Marca o cupom como utilizado somente quando o usuário realmente
+  // tenta contratar um plano mensal com desconto.
+  if (cupomAtual && descontoPercentual > 0 && permiteCupom) {
+    marcarCupomComoUsado(cupomAtual);
+
+    const message = document.getElementById("couponMessage");
+    message.textContent = "✅ Cupom registrado como utilizado neste navegador.";
+    message.className = "coupon-message success";
+  }
 }
 
 function whats(texto) {
   const numero = "5521965204419";
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank");
 }
+
+// Cria o identificador local do navegador ao carregar a página.
+obterIdDispositivo();
 
 document.getElementById("couponInput")?.addEventListener("keydown", function(event) {
   if (event.key === "Enter") aplicarCupom();
