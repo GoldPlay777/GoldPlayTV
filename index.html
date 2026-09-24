@@ -466,7 +466,7 @@ function contratarPlano(nomePlano, telas, valorOriginal, permiteCupom = false) {
     marcarCupomComoUsado(cupomAtual);
 
     const message = document.getElementById("couponMessage");
-    message.textContent = "✅ Cupom registrado como utilizado neste navegador.";
+    message.textContent = "✅ Você já utilizou este cupom.";
     message.className = "coupon-message success";
   }
 }
