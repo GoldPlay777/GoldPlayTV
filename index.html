@@ -375,7 +375,7 @@ function aplicarCupom() {
   if (cupomJaUsado(codigo)) {
     cupomAtual = null;
     document.getElementById("couponApplied").style.display = "none";
-    message.textContent = "⚠️ Este cupom já foi utilizado neste navegador.";
+    message.textContent = "⚠️ Você já utilizou este cupom.";
     message.classList.add("error");
     return;
   }
@@ -435,7 +435,7 @@ function formatarMoeda(valor) {
 function contratarPlano(nomePlano, telas, valorOriginal, permiteCupom = false) {
   if (cupomAtual && cupomJaUsado(cupomAtual)) {
     const message = document.getElementById("couponMessage");
-    message.textContent = "⚠️ Este cupom já foi utilizado neste navegador.";
+    message.textContent = "⚠️ Você já utilizou este cupom.";
     message.className = "coupon-message error";
     cupomAtual = null;
     document.getElementById("couponApplied").style.display = "none";
@@ -466,7 +466,7 @@ function contratarPlano(nomePlano, telas, valorOriginal, permiteCupom = false) {
     marcarCupomComoUsado(cupomAtual);
 
     const message = document.getElementById("couponMessage");
-    message.textContent = "✅ Você já utilizou este cupom.";
+    message.textContent = "✅ Cupom registrado como utilizado neste navegador.";
     message.className = "coupon-message success";
   }
 }
